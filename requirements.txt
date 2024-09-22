@@ -1,0 +1,15 @@
+streamlit
+langchain
+google-generativeai
+faiss-cpu
+pypdf
+sentence-transformers
+crewai
+langchain-community
+langchain_groq
+crewai-tools
+duckduckgo_search
+selenium
+lxml
+beautifulsoup4
+langchain-core
