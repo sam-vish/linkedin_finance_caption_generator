@@ -53,7 +53,19 @@ linkedin_agent/
 ├── tools.py # Tool definitions for the application
 ├── config.py # Configuration and environment variable loading
 └── .env # Environment variables (not included in version control)
+## File Structure
 
+```
+linkedin_agent/
+│
+├── main.py                  # Main Streamlit application
+├── linkedin_post_generator.py # Logic for generating LinkedIn posts
+├── llm.py                   # Language model initialization
+├── embeddings.py            # Embedding and indexing logic
+├── tools.py                 # Tool definitions for the application
+├── config.py                # Configuration and environment variable loading
+└── .env                     # Environment variables (not included in version control)
+```
 
 ## Contributing
 Contributions are welcome! Please open an issue or submit a pull request for any improvements or bug fixes.
