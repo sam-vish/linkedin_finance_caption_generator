@@ -44,16 +44,6 @@ The LinkedIn Financial Post Generator is a Streamlit application designed to hel
 3. Enter a finance topic and click "Generate LinkedIn Post" to see the results.
 
 ## File Structure
-linkedin_agent/
-│
-├── main.py # Main Streamlit application
-├── linkedin_post_generator.py # Logic for generating LinkedIn posts
-├── llm.py # Language model initialization
-├── embeddings.py # Embedding and indexing logic
-├── tools.py # Tool definitions for the application
-├── config.py # Configuration and environment variable loading
-└── .env # Environment variables (not included in version control)
-## File Structure
 
 ```
 linkedin_agent/
