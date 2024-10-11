@@ -1,6 +1,7 @@
 import os
 import streamlit as st
-from langchain.agents import initialize_agent, AgentType, Tool
+from langchain import hub
+from langchain.agents import AgentExecutor, create_react_agent, Tool
 from langchain_groq import ChatGroq
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import PromptTemplate
@@ -13,6 +14,12 @@ from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
+
+langsmith_key = os.getenv('LANGSMITH_API_KEY')
+
+# Set environment variables for LangChain
+os.environ["LANGCHAIN_TRACING_V2"] = "true"
+os.environ["LANGCHAIN_PROJECT"] = "LinkedinCaptionGenerator"
 
 # Set up environment variables
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
@@ -78,24 +85,25 @@ def main():
         search_tool = DuckDuckGoSearchRun()
         auto_response_tool = AutoResponseTool()
 
-        # Initialize the agent with the search tool
-        agent = initialize_agent(
-            [
-                Tool(
-                    name="Internet Search",
-                    func=search_tool.run,
-                    description="Useful for finding the latest information on finance and investment strategies."
-                ),
-                Tool(
-                    name="Auto Response",
-                    func=auto_response_tool.run,
-                    description="Provides an automatic response to continue with available information."
-                )
-            ],
-            llm,
-            agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-            verbose=True
-        )
+        tools = [
+            Tool(
+                name="Internet Search",
+                func=search_tool.run,
+                description="Useful for finding the latest information on finance and investment strategies."
+            ),
+            Tool(
+                name="Auto Response",
+                func=auto_response_tool.run,
+                description="Provides an automatic response to continue with available information."
+            )
+        ]
+
+        # Get the prompt to use
+        prompt = hub.pull("hwchase17/react")
+
+        # Create the ReAct agent
+        agent = create_react_agent(llm, tools, prompt)
+        agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
 
         # Research task
         research_prompt = PromptTemplate(
@@ -152,17 +160,17 @@ def main():
 
         with st.spinner("Researching and generating LinkedIn post..."):
             # Use the agent to perform research
-            research_result = agent.invoke(f"Research the latest information on {finance_topic}")
+            research_result = agent_executor.invoke({"input": f"Research the latest information on {finance_topic}"})
             
             # Retrieve relevant examples from FAISS index
             relevant_examples = retrieve_relevant_examples(finance_topic)
 
             # Generate the LinkedIn post using the research and relevant examples
-            linkedin_post = write_chain.invoke({"topic": finance_topic, "research": research_result, "examples": relevant_examples})
+            linkedin_post = write_chain.invoke({"topic": finance_topic, "research": research_result['output'], "examples": relevant_examples})
 
         # Display research results
         st.subheader("Research Result:")
-        st.text_area("Research", research_result, height=300)
+        st.text_area("Research", research_result['output'], height=300)
 
         # Display LinkedIn post
         st.subheader("LinkedIn Post:")
