@@ -5,11 +5,11 @@ from langchain.agents import AgentExecutor, create_react_agent, Tool
 from langchain_groq import ChatGroq
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import PromptTemplate
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_community.document_loaders import TextLoader
-from langchain_community.tools import DuckDuckGoSearchRun
+from langchain_community.utilities import GoogleSerperAPIWrapper
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -23,8 +23,15 @@ os.environ["LANGCHAIN_PROJECT"] = "LinkedinCaptionGenerator"
 
 # Set up environment variables
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+SERPER_API_KEY = os.environ.get("SERPER_API_KEY")
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+
 if not GROQ_API_KEY:
     raise ValueError("GROQ_API_KEY environment variable is not set")
+if not SERPER_API_KEY:
+    raise ValueError("SERPER_API_KEY environment variable is not set")
+if not OPENAI_API_KEY:
+    raise ValueError("OPENAI_API_KEY environment variable is not set")
 
 class AutoResponseTool:
     def run(self, query):
@@ -36,7 +43,16 @@ def initialize_llm():
 
 @st.cache_resource
 def initialize_embeddings():
-    return HuggingFaceEmbeddings()
+    return OpenAIEmbeddings()
+
+@st.cache_resource
+def initialize_search_tool():
+    search = GoogleSerperAPIWrapper(serper_api_key=SERPER_API_KEY)
+    return Tool(
+        name="Internet Search",
+        func=search.run,
+        description="Useful for finding the latest information on finance and investment strategies."
+    )
 
 @st.cache_resource
 def load_or_create_faiss_index():
@@ -45,7 +61,7 @@ def load_or_create_faiss_index():
     
     try:
         # Try to load existing index
-        vectorstore = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
+        vectorstore = FAISS.load_local("faiss_index", embeddings)
         st.success("Loaded existing FAISS index.")
         return vectorstore
     except (FileNotFoundError, RuntimeError):
@@ -82,15 +98,11 @@ def main():
     if st.button("Generate LinkedIn Post"):
         # Initialize tools and agents
         llm = initialize_llm()
-        search_tool = DuckDuckGoSearchRun()
+        search_tool = initialize_search_tool()
         auto_response_tool = AutoResponseTool()
 
         tools = [
-            Tool(
-                name="Internet Search",
-                func=search_tool.run,
-                description="Useful for finding the latest information on finance and investment strategies."
-            ),
+            search_tool,
             Tool(
                 name="Auto Response",
                 func=auto_response_tool.run,
@@ -159,22 +171,27 @@ def main():
         write_chain = write_prompt | llm | StrOutputParser()
 
         with st.spinner("Researching and generating LinkedIn post..."):
-            # Use the agent to perform research
-            research_result = agent_executor.invoke({"input": f"Research the latest information on {finance_topic}"})
-            
-            # Retrieve relevant examples from FAISS index
-            relevant_examples = retrieve_relevant_examples(finance_topic)
+            try:
+                # Use the agent to perform research
+                research_result = agent_executor.invoke({"input": f"Research the latest information on {finance_topic}"})
+                
+                # Retrieve relevant examples from FAISS index
+                relevant_examples = retrieve_relevant_examples(finance_topic)
 
-            # Generate the LinkedIn post using the research and relevant examples
-            linkedin_post = write_chain.invoke({"topic": finance_topic, "research": research_result['output'], "examples": relevant_examples})
+                # Generate the LinkedIn post using the research and relevant examples
+                linkedin_post = write_chain.invoke({"topic": finance_topic, "research": research_result['output'], "examples": relevant_examples})
 
-        # Display research results
-        st.subheader("Research Result:")
-        st.text_area("Research", research_result['output'], height=300)
+                # Display research results
+                st.subheader("Research Result:")
+                st.text_area("Research", research_result['output'], height=300)
 
-        # Display LinkedIn post
-        st.subheader("LinkedIn Post:")
-        st.text_area("Post", linkedin_post, height=300)
+                # Display LinkedIn post
+                st.subheader("LinkedIn Post:")
+                st.text_area("Post", linkedin_post, height=300)
+
+            except Exception as e:
+                st.error(f"An error occurred: {str(e)}")
+                st.info("Please try again. If the error persists, check your API keys and internet connection.")
 
 if __name__ == "__main__":
     main()
