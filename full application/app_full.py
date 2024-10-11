@@ -2,8 +2,8 @@ import os
 import streamlit as st
 from langchain.agents import initialize_agent, AgentType, Tool
 from langchain_groq import ChatGroq
-from langchain.chains import LLMChain
-from langchain.prompts import PromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import PromptTemplate
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain.text_splitter import CharacterTextSplitter
@@ -115,7 +115,7 @@ def main():
             Provide a comprehensive research report on the given finance topic, including actionable insights and specific data points."""
         )
 
-        research_chain = LLMChain(llm=llm, prompt=research_prompt)
+        research_chain = research_prompt | llm | StrOutputParser()
 
         # Writing task
         write_prompt = PromptTemplate(
@@ -148,17 +148,17 @@ def main():
             Remember, the goal is to sound like a knowledgeable friend giving advice, not a textbook or formal report. Make it engaging, informative, and easy to read quickly on a LinkedIn feed."""
         )
 
-        write_chain = LLMChain(llm=llm, prompt=write_prompt)
+        write_chain = write_prompt | llm | StrOutputParser()
 
         with st.spinner("Researching and generating LinkedIn post..."):
             # Use the agent to perform research
-            research_result = agent.run(f"Research the latest information on {finance_topic}")
+            research_result = agent.invoke(f"Research the latest information on {finance_topic}")
             
             # Retrieve relevant examples from FAISS index
             relevant_examples = retrieve_relevant_examples(finance_topic)
 
             # Generate the LinkedIn post using the research and relevant examples
-            linkedin_post = write_chain.run(topic=finance_topic, research=research_result, examples=relevant_examples)
+            linkedin_post = write_chain.invoke({"topic": finance_topic, "research": research_result, "examples": relevant_examples})
 
         # Display research results
         st.subheader("Research Result:")
